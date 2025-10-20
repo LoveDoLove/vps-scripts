@@ -1,4 +1,3 @@
-
 clear
 
 # Function: Display the main menu
@@ -22,8 +21,27 @@ handle_selection() {
 	case $1 in
 		1)
 			clear
-			echo "[System Information Overview]"
-			# TODO: Add system info logic here
+			script_path="$(dirname \"$0\")/scripts/system_info.sh"
+			github_raw_url="https://raw.githubusercontent.com/LoveDoLove/scripts/main/scripts/system_info.sh"
+			# Auto-download the script if not present
+			if [ ! -f "$script_path" ]; then
+				echo "[Info] system_info.sh not found. Downloading from GitHub..."
+				mkdir -p "$(dirname \"$script_path\")"
+				if command -v curl >/dev/null 2>&1; then
+					curl -fsSL "$github_raw_url" -o "$script_path"
+				elif command -v wget >/dev/null 2>&1; then
+					wget -q "$github_raw_url" -O "$script_path"
+				else
+					echo "Neither curl nor wget is available. Please install one to proceed."
+					return
+				fi
+				chmod +x "$script_path"
+			fi
+			if [ -f "$script_path" ]; then
+				bash "$script_path"
+			else
+				echo "Failed to download system_info.sh from GitHub."
+			fi
 			;;
 		2)
 			clear
