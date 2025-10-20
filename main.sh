@@ -1,3 +1,6 @@
+# Set your GitHub repository raw base URL for script downloads
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/scripts"
+
 clear
 
 # Function: Display the main menu
@@ -22,7 +25,7 @@ handle_selection() {
 		1)
 			clear
 			script_path="$(dirname \"$0\")/scripts/system_info.sh"
-			github_raw_url="https://raw.githubusercontent.com/LoveDoLove/scripts/main/scripts/system_info.sh"
+			github_raw_url="$GITHUB_RAW_BASE/system_info.sh"
 			# Auto-download the script if not present
 			if [ ! -f "$script_path" ]; then
 				echo "[Info] system_info.sh not found. Downloading from GitHub..."
