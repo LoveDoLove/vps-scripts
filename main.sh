@@ -8,7 +8,7 @@ main_menu() {
     echo "\033[1;36m================ VPS Scripts Main Menu ================\033[0m"
     echo "1. System Information Overview"
     echo "2. System Update"
-    echo "3. Docker Management"
+    echo "3. System Clean"
     echo "4. LNMP One-Click Deployment"
     echo "5. Backup & Migration"
     echo "6. BBR Acceleration & Optimization"
@@ -72,8 +72,27 @@ handle_selection() {
         ;;
         3)
             clear
-            echo "[Docker Management]"
-            # TODO: Add docker management logic here
+            script_path="$(dirname \"$0\")/scripts/system_clean.sh"
+            github_raw_url="$GITHUB_RAW_BASE/system_clean.sh"
+            # Auto-download the script if not present
+            if [ ! -f "$script_path" ]; then
+                echo "[Info] system_clean.sh not found. Downloading from GitHub..."
+                mkdir -p "$(dirname \"$script_path\")"
+                if command -v curl >/dev/null 2>&1; then
+                    curl -fsSL "$github_raw_url" -o "$script_path"
+                    elif command -v wget >/dev/null 2>&1; then
+                    wget -q "$github_raw_url" -O "$script_path"
+                else
+                    echo "Neither curl nor wget is available. Please install one to proceed."
+                    return
+                fi
+                chmod +x "$script_path"
+            fi
+            if [ -f "$script_path" ]; then
+                bash "$script_path"
+            else
+                echo "Failed to download system_clean.sh from GitHub."
+            fi
         ;;
         4)
             clear
