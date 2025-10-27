@@ -1,4 +1,5 @@
-# 修复dpkg中断问题
+#!/bin/bash
+# Fix dpkg interrupted problem
 fix_dpkg() {
     pkill -9 -f 'apt|dpkg'
     rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
