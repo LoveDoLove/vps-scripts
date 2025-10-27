@@ -1,4 +1,11 @@
-echo -e "${gl_huang}正在系统更新...${gl_bai}"
+# 修复dpkg中断问题
+fix_dpkg() {
+    pkill -9 -f 'apt|dpkg'
+    rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
+    DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+}
+
+echo -e "${gl_huang}System update in progress...${gl_bai}"
 if command -v dnf &>/dev/null; then
     dnf -y update
     elif command -v yum &>/dev/null; then
@@ -17,6 +24,6 @@ if command -v dnf &>/dev/null; then
     elif command -v opkg &>/dev/null; then
     opkg update
 else
-    echo "未知的包管理器!"
+    echo "Unknown package manager!"
     return
 fi
