@@ -1,3 +1,4 @@
+#!/bin/bash
 # Set your GitHub repository raw base URL for script downloads
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/scripts"
 
