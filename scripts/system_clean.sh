@@ -1,5 +1,13 @@
+#!/bin/bash
+# Fix dpkg interrupted problem
+fix_dpkg() {
+    pkill -9 -f 'apt|dpkg'
+    rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
+    DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+}
 
 echo -e "${gl_huang}正在系统清理...${gl_bai}"
+echo -e "${gl_huang}System cleaning in progress...${gl_bai}"
 if command -v dnf &>/dev/null; then
     rpm --rebuilddb
     dnf autoremove -y
@@ -28,13 +36,13 @@ if command -v dnf &>/dev/null; then
     journalctl --vacuum-size=500M
     
     elif command -v apk &>/dev/null; then
-    echo "清理包管理器缓存..."
+    echo "Cleaning package manager cache..."
     apk cache clean
-    echo "删除系统日志..."
+    echo "Deleting system logs..."
     rm -rf /var/log/*
-    echo "删除APK缓存..."
+    echo "Deleting APK cache..."
     rm -rf /var/cache/apk/*
-    echo "删除临时文件..."
+    echo "Deleting temporary files..."
     rm -rf /tmp/*
     
     elif command -v pacman &>/dev/null; then
@@ -52,23 +60,23 @@ if command -v dnf &>/dev/null; then
     journalctl --vacuum-size=500M
     
     elif command -v opkg &>/dev/null; then
-    echo "删除系统日志..."
+    echo "Deleting system logs..."
     rm -rf /var/log/*
-    echo "删除临时文件..."
+    echo "Deleting temporary files..."
     rm -rf /tmp/*
     
     elif command -v pkg &>/dev/null; then
-    echo "清理未使用的依赖..."
+    echo "Cleaning unused dependencies..."
     pkg autoremove -y
-    echo "清理包管理器缓存..."
+    echo "Cleaning package manager cache..."
     pkg clean -y
-    echo "删除系统日志..."
+    echo "Deleting system logs..."
     rm -rf /var/log/*
-    echo "删除临时文件..."
+    echo "Deleting temporary files..."
     rm -rf /tmp/*
     
 else
-    echo "未知的包管理器!"
+    echo "Unknown package manager!"
     return
 fi
 return
