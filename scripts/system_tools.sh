@@ -36,7 +36,7 @@ change_hostname() {
 # Change DNS
 change_dns() {
     echo -e "\n${gl_huang}Current DNS:${gl_bai}"
-    cat /etc/resolv.conf | grep nameserver
+    grep nameserver /etc/resolv.conf
     echo ""
     echo -e "  ${gl_lv}1.${gl_bai} Google DNS (8.8.8.8 / 8.8.4.4)"
     echo -e "  ${gl_lv}2.${gl_bai} Cloudflare DNS (1.1.1.1 / 1.0.0.1)"
@@ -72,7 +72,7 @@ change_dns() {
 nameserver $dns1
 nameserver $dns2
 EOF
-        # Prevent overwrite by DHCP
+        # Prevent overwrite by DHCP (makes resolv.conf immutable)
         chattr +i /etc/resolv.conf 2>/dev/null
 
         echo -e "${gl_lv}DNS changed to: $dns1 / $dns2${gl_bai}"
@@ -133,8 +133,8 @@ manage_swap() {
     case $swap_choice in
         1)
             read -p "Enter swap size in MB (e.g., 1024 for 1GB): " swap_size
-            if [ -z "$swap_size" ] || [ "$swap_size" -le 0 ] 2>/dev/null; then
-                echo -e "${gl_hong}Invalid size!${gl_bai}"
+            if ! [[ "$swap_size" =~ ^[0-9]+$ ]] || [ "$swap_size" -le 0 ]; then
+                echo -e "${gl_hong}Invalid size! Please enter a positive number.${gl_bai}"
                 return
             fi
 

@@ -60,12 +60,12 @@ show_docker_status() {
         image_count=$(docker images -q 2>/dev/null | wc -l)
         echo -e "  Images:              ${gl_lan}$image_count${gl_bai}"
 
-        # Disk usage
+        # Docker disk usage
         local disk_usage
         disk_usage=$(docker system df 2>/dev/null | tail -n +2)
         if [ -n "$disk_usage" ]; then
             echo -e "\n  ${gl_huang}Disk Usage:${gl_bai}"
-            docker system df 2>/dev/null
+            echo "$disk_usage"
         fi
     else
         echo -e "  Docker:              ${gl_hong}Not Installed${gl_bai}"

@@ -12,6 +12,21 @@ gl_kjlan='\033[96m'
 gl_bai='\033[0m'
 gl_bold='\033[1m'
 
+# Check kernel version for BBR compatibility (requires >= 4.9)
+check_kernel_bbr_support() {
+    local kernel_major kernel_minor
+    kernel_major=$(uname -r | cut -d. -f1)
+    kernel_minor=$(uname -r | cut -d. -f2)
+
+    if [ "$kernel_major" -lt 4 ] || { [ "$kernel_major" -eq 4 ] && [ "$kernel_minor" -lt 9 ]; }; then
+        echo -e "${gl_hong}BBR requires kernel version 4.9 or higher.${gl_bai}"
+        echo -e "${gl_hong}Current kernel: $(uname -r)${gl_bai}"
+        echo -e "${gl_huang}Please upgrade your kernel first.${gl_bai}"
+        return 1
+    fi
+    return 0
+}
+
 # Check BBR status
 check_bbr_status() {
     echo -e "\n${gl_bold}${gl_kjlan}============ BBR Status ============${gl_bai}"
@@ -43,17 +58,7 @@ check_bbr_status() {
 enable_bbr() {
     echo -e "${gl_huang}Enabling BBR...${gl_bai}"
 
-    # Check kernel version (BBR requires kernel >= 4.9)
-    local kernel_major kernel_minor
-    kernel_major=$(uname -r | cut -d. -f1)
-    kernel_minor=$(uname -r | cut -d. -f2)
-
-    if [ "$kernel_major" -lt 4 ] || { [ "$kernel_major" -eq 4 ] && [ "$kernel_minor" -lt 9 ]; }; then
-        echo -e "${gl_hong}BBR requires kernel version 4.9 or higher.${gl_bai}"
-        echo -e "${gl_hong}Current kernel: $(uname -r)${gl_bai}"
-        echo -e "${gl_huang}Please upgrade your kernel first.${gl_bai}"
-        return 1
-    fi
+    check_kernel_bbr_support || return 1
 
     # Check if BBR is already enabled
     local current
@@ -115,15 +120,7 @@ EOF
 enable_bbr_optimized() {
     echo -e "${gl_huang}Enabling BBR with optimized network parameters...${gl_bai}"
 
-    # Check kernel version
-    local kernel_major kernel_minor
-    kernel_major=$(uname -r | cut -d. -f1)
-    kernel_minor=$(uname -r | cut -d. -f2)
-
-    if [ "$kernel_major" -lt 4 ] || { [ "$kernel_major" -eq 4 ] && [ "$kernel_minor" -lt 9 ]; }; then
-        echo -e "${gl_hong}BBR requires kernel version 4.9 or higher.${gl_bai}"
-        return 1
-    fi
+    check_kernel_bbr_support || return 1
 
     cat > /etc/sysctl.d/99-bbr.conf << 'EOF'
 # BBR congestion control

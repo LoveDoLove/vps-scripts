@@ -167,7 +167,7 @@ setup_swap() {
     echo -e "${gl_huang}Setting up swap space...${gl_bai}"
 
     local current_swap
-    current_swap=$(free -m | awk 'NR==3{print $2}')
+    current_swap=$(free -m | awk '/Swap/{print $2}')
     echo -e "  Current swap: ${gl_lan}${current_swap}M${gl_bai}"
 
     read -p "Enter swap size in MB (e.g., 1024 for 1GB, 0 to disable): " swap_size
