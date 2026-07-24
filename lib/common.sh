@@ -17,7 +17,7 @@ gl_bold='\033[1m'
 # Default parameters
 LANG_ENV="EN"             # EN or CN
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main"
-GH_PROXY="https://"
+GH_PROXY="https://gh.kejilion.pro/"
 ENABLE_STATS="false"      # Disable analytics by default for privacy, customizable.
 
 # Detect client terminal language preference on run
