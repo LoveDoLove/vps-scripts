@@ -1,250 +1,163 @@
 #!/bin/bash
 # scripts/warp_manage.sh
-# WARP Management - Install, configure, and manage Cloudflare WARP
-# Author: LoveDoLove
+# Cloudflare WARP Management & DNS Optimization Settings
+# Bilingual (CN / EN)
 
-# Color definitions
-gl_hong='\033[31m'
-gl_lv='\033[32m'
-gl_huang='\033[33m'
-gl_lan='\033[34m'
-gl_kjlan='\033[96m'
-gl_bai='\033[0m'
-gl_bold='\033[1m'
+SCRIPT_PATH=$(dirname "$(readlink -f "$0")")
+if [ -f "$SCRIPT_PATH/../lib/common.sh" ]; then
+    . "$SCRIPT_PATH/../lib/common.sh"
+elif [ -f "/tmp/vps-scripts/lib/common.sh" ]; then
+    . "/tmp/vps-scripts/lib/common.sh"
+fi
 
-# Check if WARP is installed
-check_warp_installed() {
-    if command -v warp-cli &>/dev/null; then
-        return 0
-    else
-        return 1
-    fi
-}
+detect_language "$1"
+require_root
+install_pkgs curl wget
 
-# Show WARP status
-show_warp_status() {
-    echo -e "\n${gl_bold}${gl_kjlan}============ WARP Status ============${gl_bai}"
-
-    if check_warp_installed; then
-        echo -e "  WARP Client:         ${gl_lv}Installed${gl_bai}"
-
-        local warp_status
-        warp_status=$(warp-cli status 2>/dev/null)
-        if [ -n "$warp_status" ]; then
-            echo -e "  Status:              ${gl_lan}$warp_status${gl_bai}"
-        fi
-
-        local warp_account
-        warp_account=$(warp-cli account 2>/dev/null)
-        if [ -n "$warp_account" ]; then
-            echo -e "  Account:             ${gl_lan}$warp_account${gl_bai}"
-        fi
-    else
-        echo -e "  WARP Client:         ${gl_hong}Not Installed${gl_bai}"
-    fi
-
-    # Check current IP info
-    echo -e "\n  ${gl_huang}Current Network Info:${gl_bai}"
-    local ipv4
-    ipv4=$(curl -s4 --max-time 5 https://ipinfo.io/ip 2>/dev/null)
-    if [ -n "$ipv4" ]; then
-        echo -e "  IPv4:                ${gl_lan}$ipv4${gl_bai}"
-    else
-        echo -e "  IPv4:                ${gl_hong}N/A${gl_bai}"
-    fi
-
-    local ipv6
-    ipv6=$(curl -s6 --max-time 5 https://v6.ipinfo.io/ip 2>/dev/null)
-    if [ -n "$ipv6" ]; then
-        echo -e "  IPv6:                ${gl_lan}$ipv6${gl_bai}"
-    else
-        echo -e "  IPv6:                ${gl_hong}N/A${gl_bai}"
-    fi
-
-    # Check if traffic goes through Cloudflare
-    local cf_check
-    cf_check=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | grep "warp=" | cut -d= -f2)
-    if [ "$cf_check" = "on" ] || [ "$cf_check" = "plus" ]; then
-        echo -e "  WARP Connection:     ${gl_lv}Active ($cf_check)${gl_bai}"
-    else
-        echo -e "  WARP Connection:     ${gl_hong}Inactive${gl_bai}"
-    fi
-
-    echo -e "${gl_kjlan}======================================${gl_bai}"
-}
-
-# Install WARP using official Cloudflare script
-install_warp_official() {
-    if check_warp_installed; then
-        echo -e "${gl_lv}WARP is already installed.${gl_bai}"
-        return 0
-    fi
-
-    echo -e "${gl_huang}Installing Cloudflare WARP...${gl_bai}"
-
-    if command -v curl &>/dev/null; then
-        curl -fsSL https://pkg.cloudflareclient.com/install | sh
-    elif command -v wget &>/dev/null; then
-        wget -qO- https://pkg.cloudflareclient.com/install | sh
-    else
-        echo -e "${gl_hong}Neither curl nor wget is available.${gl_bai}"
-        return 1
-    fi
-
-    if check_warp_installed; then
-        echo -e "${gl_lv}WARP installed successfully.${gl_bai}"
-        echo -e "${gl_huang}Registering WARP...${gl_bai}"
-        warp-cli registration new 2>/dev/null
-        echo -e "${gl_lv}WARP registration complete.${gl_bai}"
-    else
-        echo -e "${gl_hong}WARP installation failed.${gl_bai}"
-        return 1
-    fi
-}
-
-# Install WARP via warp-go (fscarmen)
-install_warp_fscarmen() {
-    echo -e "${gl_huang}Installing WARP via fscarmen/warp script...${gl_bai}"
-    echo -e "${gl_lan}This script provides additional options for WARP configuration.${gl_bai}"
-
-    if command -v curl &>/dev/null; then
-        bash <(curl -fsSL https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh)
-    elif command -v wget &>/dev/null; then
-        bash <(wget -qO- https://gitlab.com/fscarmen/warp/-/raw/main/menu.sh)
-    else
-        echo -e "${gl_hong}Neither curl nor wget is available.${gl_bai}"
-        return 1
-    fi
-}
-
-# Connect WARP
-connect_warp() {
-    if ! check_warp_installed; then
-        echo -e "${gl_hong}WARP is not installed. Please install it first.${gl_bai}"
-        return 1
-    fi
-
-    echo -e "${gl_huang}Connecting WARP...${gl_bai}"
-    warp-cli connect 2>/dev/null
-    sleep 2
-
-    local cf_check
-    cf_check=$(curl -s --max-time 5 https://www.cloudflare.com/cdn-cgi/trace 2>/dev/null | grep "warp=" | cut -d= -f2)
-    if [ "$cf_check" = "on" ] || [ "$cf_check" = "plus" ]; then
-        echo -e "${gl_lv}WARP connected successfully.${gl_bai}"
-    else
-        echo -e "${gl_huang}WARP connect command sent. Checking status...${gl_bai}"
-        warp-cli status 2>/dev/null
-    fi
-}
-
-# Disconnect WARP
-disconnect_warp() {
-    if ! check_warp_installed; then
-        echo -e "${gl_hong}WARP is not installed.${gl_bai}"
-        return 1
-    fi
-
-    echo -e "${gl_huang}Disconnecting WARP...${gl_bai}"
-    warp-cli disconnect 2>/dev/null
-    echo -e "${gl_lv}WARP disconnected.${gl_bai}"
-}
-
-# Uninstall WARP
-uninstall_warp() {
-    if ! check_warp_installed; then
-        echo -e "${gl_huang}WARP is not installed.${gl_bai}"
-        return 0
-    fi
-
-    echo -e "${gl_hong}WARNING: This will remove Cloudflare WARP!${gl_bai}"
-    read -p "Are you sure? (y/N): " confirm
-    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        echo -e "${gl_huang}Cancelled.${gl_bai}"
-        return 0
-    fi
-
-    echo -e "${gl_huang}Disconnecting WARP...${gl_bai}"
-    warp-cli disconnect 2>/dev/null
-
-    echo -e "${gl_huang}Uninstalling WARP...${gl_bai}"
-    if command -v apt &>/dev/null; then
-        apt remove -y cloudflare-warp 2>/dev/null
-        apt purge -y cloudflare-warp 2>/dev/null
-    elif command -v dnf &>/dev/null; then
-        dnf remove -y cloudflare-warp 2>/dev/null
-    elif command -v yum &>/dev/null; then
-        yum remove -y cloudflare-warp 2>/dev/null
-    fi
-
-    echo -e "${gl_lv}WARP has been uninstalled.${gl_bai}"
-}
-
-# Set WARP mode
-set_warp_mode() {
-    if ! check_warp_installed; then
-        echo -e "${gl_hong}WARP is not installed.${gl_bai}"
-        return 1
-    fi
-
-    echo -e "\n${gl_huang}Select WARP Mode:${gl_bai}"
-    echo -e "  ${gl_lv}1.${gl_bai} WARP (full tunnel)"
-    echo -e "  ${gl_lv}2.${gl_bai} WARP + DNS over HTTPS"
-    echo -e "  ${gl_lv}3.${gl_bai} Proxy mode (SOCKS5 on 127.0.0.1:40000)"
-    read -p "Please enter your choice: " mode_choice
-
-    case $mode_choice in
-        1)
-            warp-cli mode warp 2>/dev/null
-            echo -e "${gl_lv}WARP mode set to: full tunnel${gl_bai}"
+get_warp_msg() {
+    local key="$1"
+    case "$LANG_ENV" in
+        CN)
+            case "$key" in
+                "title") echo "Cloudflare WARP 網際網路加速及 DNS 優化管理" ;;
+                "opt_1") echo "安裝/升級 Cloudflare WARP 用戶端 (warp-cli)" ;;
+                "opt_2") echo "開啟 WARP 全局代理隧道模式 (S4/v6 優先網關)" ;;
+                "opt_3") echo "斷開 / 停止 WARP 網路代理鏈結" ;;
+                "opt_4") echo "配置 WARP 單獨 SOCKS5 代理形式 (運行在 127.0.0.1:40000)" ;;
+                "opt_5") echo "調優並重新設定本機 DNS 解析伺服器 (Auto DNS optimization)" ;;
+                "status_is") echo "WARP 運作狀態: " ;;
+                "not_inst") echo "未安裝" ;;
+                "running") echo "連接成功" ;;
+                "disconnected") echo "已中斷" ;;
+            esac
             ;;
-        2)
-            warp-cli mode doh 2>/dev/null
-            echo -e "${gl_lv}WARP mode set to: DNS over HTTPS${gl_bai}"
-            ;;
-        3)
-            warp-cli mode proxy 2>/dev/null
-            echo -e "${gl_lv}WARP mode set to: Proxy (SOCKS5 on 127.0.0.1:40000)${gl_bai}"
-            ;;
-        *)
-            echo -e "${gl_hong}Invalid option!${gl_bai}"
+        *) # EN
+            case "$key" in
+                "title") echo "Cloudflare WARP Configuration & DNS Optimizations" ;;
+                "opt_1") echo "Install/Upgrade Cloudflare WARP client tools" ;;
+                "opt_2") echo "Enable WARP Global Tunnel (Prefer IPv4/v6 Gateway)" ;;
+                "opt_3") echo "Disconnect & Suspend active WARP tunnel connections" ;;
+                "opt_4") echo "Configure WARP local SOCKS5 proxy (Listening on 127.0.0.1:40000)" ;;
+                "opt_5") echo "Run System DNS resolvers tuning automation scripts" ;;
+                "status_is") echo "CF WARP Daemon running state: " ;;
+                "not_inst") echo "Not installed" ;;
+                "running") echo "Connected" ;;
+                "disconnected") echo "Disconnected" ;;
+            esac
             ;;
     esac
 }
 
-# Main menu
+check_warp_status() {
+    if ! command -v warp-cli &>/dev/null; then
+        echo -e "$(get_warp_msg 'status_is') ${gl_hong}$(get_warp_msg 'not_inst')${gl_bai}"
+    else
+        local status=$(warp-cli status 2>/dev/null | grep -i "status" | awk '{print $NF}')
+        if [[ "$status" == *"Connected"* ]]; then
+            echo -e "$(get_warp_msg 'status_is') ${gl_lv}$(get_warp_msg 'running')${gl_bai}"
+        else
+            echo -e "$(get_warp_msg 'status_is') ${gl_huang}$(get_warp_msg 'disconnected')${gl_bai}"
+        fi
+    fi
+}
+
+install_warp() {
+    if ! command -v warp-cli &>/dev/null; then
+        echo -e "${gl_huang}Registering Cloudflare official package repository...${gl_bai}"
+        local pm=$(detect_pm)
+        case "$pm" in
+            apt)
+                curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/cloudflare-warp.gpg --yes
+                local codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+                echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp.gpg] https://pkg.cloudflareclient.com/ $codename main" > /etc/apt/sources.list.d/cloudflare-client.list
+                DEBIAN_FRONTEND=noninteractive apt-get update -y
+                DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflare-warp
+                ;;
+            dnf|yum)
+                rpm -ivh https://pkg.cloudflareclient.com/cloudflare-release-el$(rpm -E %rhel).rpm 2>/dev/null
+                yum install -y cloudflare-warp
+                ;;
+            *)
+                echo "WARP installer only supports APT / YUM based systems."
+                return 1
+                ;;
+        esac
+        warp-cli registration new 2>/dev/null || warp-cli register 2>/dev/null
+    fi
+    echo "Cloudflare WARP client setup complete."
+}
+
+connect_warp() {
+    if ! command -v warp-cli &>/dev/null; then
+        return
+    fi
+    warp-cli mode warp 2>/dev/null
+    warp-cli connect 2>/dev/null
+    echo "Connecting to Cloudflare warp network..."
+}
+
+disconnect_warp() {
+    if ! command -v warp-cli &>/dev/null; then
+        return
+    fi
+    warp-cli disconnect 2>/dev/null
+    echo "Warp disconnected."
+}
+
+socks5_warp() {
+    if ! command -v warp-cli &>/dev/null; then
+        return
+    fi
+    warp-cli mode proxy 2>/dev/null
+    warp-cli proxy port 40000 2>/dev/null
+    warp-cli connect 2>/dev/null
+    echo "WARP client running in local SOCKS5 proxy mode: SOCKS5 address: 127.0.0.1:40000"
+}
+
+optimize_dns() {
+    # Detect region, assign best public servers DNS resolvers settings
+    local region=$(curl -s --max-time 2 ipinfo.io/country)
+    if [[ "$region" == "CN" ]]; then
+        cat <<EOF > /etc/resolv.conf
+nameserver 223.5.5.5
+nameserver 119.29.29.29
+EOF
+    else
+        cat <<EOF > /etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+    fi
+    echo "DNS optimization scripts finished successfully."
+}
+
 warp_menu() {
     while true; do
-        echo ""
-        echo -e "${gl_bold}${gl_kjlan}============ WARP Management ============${gl_bai}"
-        echo -e "  ${gl_lv}1.${gl_bai} Show WARP Status"
-        echo -e "  ${gl_lv}2.${gl_bai} Install WARP (Official)"
-        echo -e "  ${gl_lv}3.${gl_bai} Install WARP (fscarmen script)"
-        echo -e "  ${gl_lv}4.${gl_bai} Connect WARP"
-        echo -e "  ${gl_lv}5.${gl_bai} Disconnect WARP"
-        echo -e "  ${gl_lv}6.${gl_bai} Set WARP Mode"
-        echo -e "  ${gl_lv}7.${gl_bai} Uninstall WARP"
-        echo ""
-        echo -e "  ${gl_hong}0.${gl_bai} Return to Main Menu"
-        echo -e "${gl_kjlan}===========================================${gl_bai}"
-        read -p "Please enter your choice: " choice
-
-        case $choice in
-            1) show_warp_status ;;
-            2) install_warp_official ;;
-            3) install_warp_fscarmen ;;
-            4) connect_warp ;;
-            5) disconnect_warp ;;
-            6) set_warp_mode ;;
-            7) uninstall_warp ;;
-            0) return ;;
-            *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
-        esac
-
-        echo ""
-        echo -e "${gl_huang}Press any key to continue...${gl_bai}"
-        read -n 1 -s
         clear
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+        echo -e "                 $(get_warp_msg 'title')                                "
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+        check_warp_status
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_lv}1.${gl_bai} $(get_warp_msg 'opt_1')"
+        echo -e "  ${gl_lv}2.${gl_bai} $(get_warp_msg 'opt_2')"
+        echo -e "  ${gl_lv}3.${gl_bai} $(get_warp_msg 'opt_3')"
+        echo -e "  ${gl_lv}4.${gl_bai} $(get_warp_msg 'opt_4')"
+        echo -e "  ${gl_lv}5.${gl_bai} $(get_warp_msg 'opt_5')"
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_hong}0.${gl_bai} $(get_msg 'press_any_key')"
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+
+        read -p "Selection: " sub_ch
+        case "$sub_ch" in
+            1) install_warp; break_end ;;
+            2) connect_warp; break_end ;;
+            3) disconnect_warp; break_end ;;
+            4) socks5_warp; break_end ;;
+            5) optimize_dns; break_end ;;
+            0) return ;;
+            *) echo -e "${gl_hong}$(get_msg 'invalid_selection')${gl_bai}"; sleep 2 ;;
+        esac
     done
 }
 

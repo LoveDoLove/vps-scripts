@@ -1,460 +1,250 @@
 #!/bin/bash
 # scripts/system_tools.sh
-# System Tools - System configuration and management utilities
-# Author: LoveDoLove
+# System Tools - System configuration, timezone, root passwd, ssh port, and locale
+# Bilingual (CN / EN)
 
-# Color definitions
-gl_hong='\033[31m'
-gl_lv='\033[32m'
-gl_huang='\033[33m'
-gl_lan='\033[34m'
-gl_kjlan='\033[96m'
-gl_bai='\033[0m'
-gl_bold='\033[1m'
+SCRIPT_PATH=$(dirname "$(readlink -f "$0")")
+if [ -f "$SCRIPT_PATH/../lib/common.sh" ]; then
+    . "$SCRIPT_PATH/../lib/common.sh"
+elif [ -f "/tmp/vps-scripts/lib/common.sh" ]; then
+    . "/tmp/vps-scripts/lib/common.sh"
+fi
 
-# Change hostname
-change_hostname() {
-    local current_hostname
-    current_hostname=$(hostname)
-    echo -e "  Current hostname: ${gl_lan}$current_hostname${gl_bai}"
-    read -p "Enter new hostname (leave blank to cancel): " new_hostname
+detect_language "$1"
+require_root
 
-    if [ -z "$new_hostname" ]; then
-        echo -e "${gl_huang}Cancelled.${gl_bai}"
-        return
-    fi
-
-    hostnamectl set-hostname "$new_hostname" 2>/dev/null
-    # Update /etc/hosts
-    if grep -q "$current_hostname" /etc/hosts 2>/dev/null; then
-        sed -i "s/$current_hostname/$new_hostname/g" /etc/hosts
-    fi
-
-    echo -e "${gl_lv}Hostname changed to: $new_hostname${gl_bai}"
-}
-
-# Change DNS
-change_dns() {
-    echo -e "\n${gl_huang}Current DNS:${gl_bai}"
-    grep nameserver /etc/resolv.conf
-    echo ""
-    echo -e "  ${gl_lv}1.${gl_bai} Google DNS (8.8.8.8 / 8.8.4.4)"
-    echo -e "  ${gl_lv}2.${gl_bai} Cloudflare DNS (1.1.1.1 / 1.0.0.1)"
-    echo -e "  ${gl_lv}3.${gl_bai} Alibaba DNS (223.5.5.5 / 223.6.6.6)"
-    echo -e "  ${gl_lv}4.${gl_bai} Tencent DNS (119.29.29.29 / 119.28.28.28)"
-    echo -e "  ${gl_lv}5.${gl_bai} Custom DNS"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select DNS: " dns_choice
-
-    local dns1 dns2
-    case $dns_choice in
-        1) dns1="8.8.8.8"; dns2="8.8.4.4" ;;
-        2) dns1="1.1.1.1"; dns2="1.0.0.1" ;;
-        3) dns1="223.5.5.5"; dns2="223.6.6.6" ;;
-        4) dns1="119.29.29.29"; dns2="119.28.28.28" ;;
-        5)
-            read -p "Enter primary DNS: " dns1
-            read -p "Enter secondary DNS: " dns2
-            ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}"; return ;;
-    esac
-
-    if [ -n "$dns1" ]; then
-        # Disable systemd-resolved if active
-        if systemctl is-active systemd-resolved &>/dev/null; then
-            systemctl stop systemd-resolved 2>/dev/null
-            systemctl disable systemd-resolved 2>/dev/null
-            rm -f /etc/resolv.conf
-        fi
-
-        cat > /etc/resolv.conf << EOF
-nameserver $dns1
-nameserver $dns2
-EOF
-        # Prevent overwrite by DHCP (makes resolv.conf immutable)
-        chattr +i /etc/resolv.conf 2>/dev/null
-
-        echo -e "${gl_lv}DNS changed to: $dns1 / $dns2${gl_bai}"
-    fi
-}
-
-# Change timezone
-change_timezone() {
-    local current_tz
-    current_tz=$(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null)
-    echo -e "  Current timezone: ${gl_lan}$current_tz${gl_bai}"
-    echo ""
-    echo -e "  ${gl_lv}1.${gl_bai} Asia/Shanghai (UTC+8)"
-    echo -e "  ${gl_lv}2.${gl_bai} Asia/Tokyo (UTC+9)"
-    echo -e "  ${gl_lv}3.${gl_bai} Asia/Singapore (UTC+8)"
-    echo -e "  ${gl_lv}4.${gl_bai} America/New_York (UTC-5)"
-    echo -e "  ${gl_lv}5.${gl_bai} America/Los_Angeles (UTC-8)"
-    echo -e "  ${gl_lv}6.${gl_bai} Europe/London (UTC+0)"
-    echo -e "  ${gl_lv}7.${gl_bai} Custom timezone"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select timezone: " tz_choice
-
-    local new_tz
-    case $tz_choice in
-        1) new_tz="Asia/Shanghai" ;;
-        2) new_tz="Asia/Tokyo" ;;
-        3) new_tz="Asia/Singapore" ;;
-        4) new_tz="America/New_York" ;;
-        5) new_tz="America/Los_Angeles" ;;
-        6) new_tz="Europe/London" ;;
-        7)
-            read -p "Enter timezone (e.g., Asia/Shanghai): " new_tz
-            ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}"; return ;;
-    esac
-
-    if [ -n "$new_tz" ]; then
-        timedatectl set-timezone "$new_tz" 2>/dev/null || \
-            ln -sf "/usr/share/zoneinfo/$new_tz" /etc/localtime
-        echo -e "${gl_lv}Timezone changed to: $new_tz${gl_bai}"
-        echo -e "  Current time: ${gl_lan}$(date)${gl_bai}"
-    fi
-}
-
-# Manage swap
-manage_swap() {
-    echo -e "\n${gl_huang}Current Swap Status:${gl_bai}"
-    free -h | grep -i swap
-    swapon --show 2>/dev/null
-
-    echo ""
-    echo -e "  ${gl_lv}1.${gl_bai} Create/Resize Swap"
-    echo -e "  ${gl_lv}2.${gl_bai} Disable Swap"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select: " swap_choice
-
-    case $swap_choice in
-        1)
-            read -p "Enter swap size in MB (e.g., 1024 for 1GB): " swap_size
-            if ! [[ "$swap_size" =~ ^[0-9]+$ ]] || [ "$swap_size" -le 0 ]; then
-                echo -e "${gl_hong}Invalid size! Please enter a positive number.${gl_bai}"
-                return
-            fi
-
-            swapoff -a 2>/dev/null
-            rm -f /swapfile 2>/dev/null
-
-            echo -e "${gl_huang}Creating ${swap_size}M swap file...${gl_bai}"
-            dd if=/dev/zero of=/swapfile bs=1M count="$swap_size" status=progress
-            chmod 600 /swapfile
-            mkswap /swapfile
-            swapon /swapfile
-
-            if ! grep -q "swapfile" /etc/fstab; then
-                echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
-            fi
-
-            echo -e "${gl_lv}Swap created successfully.${gl_bai}"
-            free -h
-            ;;
-        2)
-            swapoff -a 2>/dev/null
-            rm -f /swapfile 2>/dev/null
-            sed -i '/swapfile/d' /etc/fstab
-            echo -e "${gl_lv}Swap disabled.${gl_bai}"
-            ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
-    esac
-}
-
-# Change root password
-change_root_password() {
-    echo -e "${gl_huang}Changing root password...${gl_bai}"
-    passwd root
-}
-
-# Enable/disable root SSH login
-manage_root_ssh() {
-    echo -e "\n${gl_huang}Root SSH Login Management:${gl_bai}"
-
-    local current_status
-    if grep -q "^PermitRootLogin yes" /etc/ssh/sshd_config 2>/dev/null; then
-        current_status="Enabled"
-    elif grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null; then
-        current_status="Disabled"
-    else
-        current_status="Default (check config)"
-    fi
-
-    echo -e "  Current status: ${gl_lan}$current_status${gl_bai}"
-    echo ""
-    echo -e "  ${gl_lv}1.${gl_bai} Enable Root SSH Login"
-    echo -e "  ${gl_lv}2.${gl_bai} Disable Root SSH Login"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select: " ssh_choice
-
-    case $ssh_choice in
-        1)
-            sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-            echo -e "${gl_lv}Root SSH login enabled.${gl_bai}"
-            ;;
-        2)
-            sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
-            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-            echo -e "${gl_lv}Root SSH login disabled.${gl_bai}"
-            ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
-    esac
-}
-
-# Change SSH port
-change_ssh_port() {
-    local current_port
-    current_port=$(grep "^Port " /etc/ssh/sshd_config 2>/dev/null | awk '{print $2}')
-    current_port="${current_port:-22}"
-    echo -e "  Current SSH port: ${gl_lan}$current_port${gl_bai}"
-
-    read -p "Enter new SSH port (1-65535): " new_port
-
-    if [ -z "$new_port" ]; then
-        echo -e "${gl_huang}Cancelled.${gl_bai}"
-        return
-    fi
-
-    if [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ] 2>/dev/null; then
-        echo -e "${gl_hong}Invalid port number!${gl_bai}"
-        return
-    fi
-
-    # Update SSH config
-    if grep -q "^Port " /etc/ssh/sshd_config; then
-        sed -i "s/^Port .*/Port $new_port/" /etc/ssh/sshd_config
-    elif grep -q "^#Port " /etc/ssh/sshd_config; then
-        sed -i "s/^#Port .*/Port $new_port/" /etc/ssh/sshd_config
-    else
-        echo "Port $new_port" >> /etc/ssh/sshd_config
-    fi
-
-    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-
-    echo -e "${gl_lv}SSH port changed to: $new_port${gl_bai}"
-    echo -e "${gl_hong}IMPORTANT: Make sure port $new_port is open in your firewall!${gl_bai}"
-}
-
-# Manage crontab
-manage_crontab() {
-    echo -e "\n${gl_huang}Crontab Management:${gl_bai}"
-    echo -e "  ${gl_lv}1.${gl_bai} View current crontab"
-    echo -e "  ${gl_lv}2.${gl_bai} Edit crontab"
-    echo -e "  ${gl_lv}3.${gl_bai} Add a reboot cron job"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select: " cron_choice
-
-    case $cron_choice in
-        1)
-            echo -e "\n${gl_lan}Current crontab entries:${gl_bai}"
-            crontab -l 2>/dev/null || echo "No crontab configured."
-            ;;
-        2)
-            crontab -e
-            ;;
-        3)
-            echo -e "${gl_huang}Schedule auto-reboot:${gl_bai}"
-            echo -e "  ${gl_lv}1.${gl_bai} Daily at 4:00 AM"
-            echo -e "  ${gl_lv}2.${gl_bai} Weekly on Sunday at 4:00 AM"
-            echo -e "  ${gl_lv}3.${gl_bai} Monthly on 1st at 4:00 AM"
-            read -p "Please select: " reboot_choice
-            local cron_expr
-            case $reboot_choice in
-                1) cron_expr="0 4 * * *" ;;
-                2) cron_expr="0 4 * * 0" ;;
-                3) cron_expr="0 4 1 * *" ;;
-                *) echo -e "${gl_hong}Invalid option!${gl_bai}"; return ;;
+# Translation lookup
+get_sys_msg() {
+    local key="$1"
+    case "$LANG_ENV" in
+        CN)
+            case "$key" in
+                "title") echo "系統環境配置與伺服器基本工具面板" ;;
+                "opt_1") echo "修改伺服器主機名稱 (Hostname)" ;;
+                "opt_2") echo "更改系統靜態解析 DNS (NameServers)" ;;
+                "opt_3") echo "變更系統所在時區 (Timezone)" ;;
+                "opt_4") echo "建立或重置虛擬記憶體 Swapfile" ;;
+                "opt_5") echo "修改系統 root 帳戶管理密碼" ;;
+                "opt_6") echo "開啟 / 停用 Root 遠端 SSH 金鑰登入方式" ;;
+                "opt_7") echo "變更 SSH 連線監聽端口 (Port)" ;;
+                "opt_8") echo "變更/修復 Linux 系統區域編碼 (Locale)" ;;
+                "opt_9") echo "啟用或停用系統原生 IPv6 網路協議" ;;
+                "opt_10") echo "安裝及查看 Fail2ban 防暴力破解工具" ;;
+                "cur_hs") echo "當前主機名: " ;;
+                "cur_dns") echo "當前解析 DNS: " ;;
+                "cur_tz") echo "當前時區時間: " ;;
+                "enter_hs") echo "請輸入新的主機名稱 (Hostname): " ;;
+                "enter_dns") echo "請輸入主要與次要 DNS，以空格分開 (例如 8.8.8.8 1.1.1.1): " ;;
+                "enter_pwd") echo "請輸入新的 root 密碼: " ;;
+                "enter_ssh_p") echo "請輸入新的 SSH 端口號: " ;;
+                "ssh_warn") echo "重設 SSH 端口前，請確保在雲服務控制台已放行對應端口，以免失聯！" ;;
+                "fail2ban_ok") echo "Fail2ban 服務狀態已展示。" ;;
             esac
-            (crontab -l 2>/dev/null; echo "$cron_expr /sbin/reboot") | crontab -
-            echo -e "${gl_lv}Auto-reboot cron job added: $cron_expr${gl_bai}"
             ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
+        *) # EN
+            case "$key" in
+                "title") echo "System Tools & OS configuration dashboard" ;;
+                "opt_1") echo "Change Machine Hostname" ;;
+                "opt_2") echo "Modify System Static DNS Resolvers" ;;
+                "opt_3") echo "Change Operating System Timezone" ;;
+                "opt_4") echo "Configure or Resize Swapfile Memory" ;;
+                "opt_5") echo "Update root security User Password" ;;
+                "opt_6") echo "Toggle Root Remote SSH Logging Authority" ;;
+                "opt_7") echo "Change Default SSH daemon Port" ;;
+                "opt_8") echo "Update/Fix System Locale Encoding" ;;
+                "opt_9") echo "Toggle IPv6 Network Protocol" ;;
+                "opt_10") echo "Uninstall & Monitor Fail2ban Brute Force Defender" ;;
+                "cur_hs") echo "Current Hostname: " ;;
+                "cur_dns") echo "Current DNS Resolvers: " ;;
+                "cur_tz") echo "Current System Time/Zone: " ;;
+                "enter_hs") echo "Enter new host name: " ;;
+                "enter_dns") echo "Enter Primary & Secondary resolvers (e.g. 8.8.8.8 1.1.1.1): " ;;
+                "enter_pwd") echo "Enter new root password: " ;;
+                "enter_ssh_p") echo "Enter new SSH Port number: " ;;
+                "ssh_warn") echo "Security Alert! Make sure you open the new port on your cloud firewall console first!" ;;
+                "fail2ban_ok") echo "Fail2ban daemon status displayed." ;;
+            esac
+            ;;
     esac
 }
 
-# Enable/Disable IPv6
-toggle_ipv6() {
-    local ipv6_status
-    ipv6_status=$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null)
+show_system_overview() {
+    echo -e "$(get_sys_msg 'cur_hs') ${gl_huang}$(hostname)${gl_bai}"
+    local dns_s=$(grep "^nameserver" /etc/resolv.conf | awk '{print $2}' | tr '\n' ' ')
+    echo -e "$(get_sys_msg 'cur_dns') ${gl_lan}${dns_s}${gl_bai}"
+    echo -e "$(get_sys_msg 'cur_tz') ${gl_lv}$(date)${gl_bai}"
+}
 
-    if [ "$ipv6_status" = "1" ]; then
-        echo -e "  IPv6 status: ${gl_hong}Disabled${gl_bai}"
-    else
-        echo -e "  IPv6 status: ${gl_lv}Enabled${gl_bai}"
+upd_hostname() {
+    read -p "$(get_sys_msg 'enter_hs')" new_hs
+    if [ -n "$new_hs" ]; then
+        hostnamectl set-hostname "$new_hs" 2>/dev/null || echo "$new_hs" > /etc/hostname
+        echo "Hostname updated to $new_hs. Requires reconnecting terminal shell to display changes."
     fi
+}
 
-    echo ""
-    echo -e "  ${gl_lv}1.${gl_bai} Enable IPv6"
-    echo -e "  ${gl_lv}2.${gl_bai} Disable IPv6"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select: " ipv6_choice
+upd_dns() {
+    read -p "$(get_sys_msg 'enter_dns')" dns1 dns2
+    if [[ -n "$dns1" ]]; then
+        echo -e "nameserver $dns1\nnameserver ${dns2:-8.8.8.8}" > /etc/resolv.conf
+        echo "DNS updated successfully."
+    fi
+}
 
-    case $ipv6_choice in
+upd_timezone() {
+    if command -v tzselect &>/dev/null; then
+        dpkg-reconfigure tzdata 2>/dev/null || tzselect
+    else
+        # Fallback interactive manual selection
+        local tz="UTC"
+        if [[ "$LANG_ENV" == "CN" ]]; then
+            tz="Asia/Shanghai"
+        fi
+        ln -sf "/usr/share/zoneinfo/$tz" /etc/localtime
+    fi
+}
+
+upd_root_pwd() {
+    read -p "$(get_sys_msg 'enter_pwd')" pwd_val
+    if [ -n "$pwd_val" ]; then
+        echo "root:$pwd_val" | chpasswd
+        echo "Root password updated."
+    fi
+}
+
+toggle_ssh_root() {
+    local config_file="/etc/ssh/sshd_config"
+    clear
+    echo -e "PermitRootLogin SSH Setting:"
+    echo -e "  ${gl_lv}1.${gl_bai} Enable Remote Root Login"
+    echo -e "  ${gl_lv}2.${gl_bai} Disable Remote Root Login"
+    read -p "Select: " root_ch
+
+    case "$root_ch" in
         1)
-            sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null
-            sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null
-            cat > /etc/sysctl.d/99-ipv6.conf << 'EOF'
-net.ipv6.conf.all.disable_ipv6=0
-net.ipv6.conf.default.disable_ipv6=0
-EOF
-            echo -e "${gl_lv}IPv6 has been enabled.${gl_bai}"
+            sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' "$config_file"
+            sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' "$config_file"
+            sys_service restart sshd 2>/dev/null || sys_service restart ssh 2>/dev/null
+            echo "Remote root login enabled."
             ;;
         2)
-            sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null
-            sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null
-            cat > /etc/sysctl.d/99-ipv6.conf << 'EOF'
-net.ipv6.conf.all.disable_ipv6=1
-net.ipv6.conf.default.disable_ipv6=1
-EOF
-            echo -e "${gl_lv}IPv6 has been disabled.${gl_bai}"
+            sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' "$config_file"
+            sys_service restart sshd 2>/dev/null || sys_service restart ssh 2>/dev/null
+            echo "Remote root login disabled."
             ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
     esac
 }
 
-# Set system locale
-set_locale() {
-    echo -e "\n${gl_huang}Current locale:${gl_bai}"
-    locale 2>/dev/null | head -1
+upd_ssh_port() {
+    local port_val
+    echo -e "${gl_hong}$(get_sys_msg 'ssh_warn')${gl_bai}"
+    read -p "$(get_sys_msg 'enter_ssh_p')" port_val
 
-    echo ""
-    echo -e "  ${gl_lv}1.${gl_bai} English (en_US.UTF-8)"
-    echo -e "  ${gl_lv}2.${gl_bai} Chinese Simplified (zh_CN.UTF-8)"
-    echo -e "  ${gl_lv}3.${gl_bai} Japanese (ja_JP.UTF-8)"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select: " locale_choice
-
-    local new_locale
-    case $locale_choice in
-        1) new_locale="en_US.UTF-8" ;;
-        2) new_locale="zh_CN.UTF-8" ;;
-        3) new_locale="ja_JP.UTF-8" ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}"; return ;;
-    esac
-
-    if command -v locale-gen &>/dev/null; then
-        locale-gen "$new_locale" 2>/dev/null
+    if [[ "$port_val" =~ ^[0-9]+$ ]]; then
+        sed -i "s/^#*Port.*/Port $port_val/g" /etc/ssh/sshd_config
+        sys_service restart sshd 2>/dev/null || sys_service restart ssh 2>/dev/null
+        echo -e "${gl_lv}SSH Port updated to: $port_val${gl_bai}"
     fi
+}
 
-    if command -v localectl &>/dev/null; then
-        localectl set-locale LANG="$new_locale"
+upd_locale() {
+    install_pkgs locales locales-all 2>/dev/null
+    if [[ "$LANG_ENV" == "CN" ]]; then
+        locale-gen zh_CN.UTF-8 2>/dev/null
+        export LANG=zh_CN.UTF-8
+        update-locale LANG=zh_CN.UTF-8 2>/dev/null
     else
-        echo "LANG=$new_locale" > /etc/locale.conf 2>/dev/null
-        export LANG="$new_locale"
+        locale-gen en_US.UTF-8 2>/dev/null
+        export LANG=en_US.UTF-8
+        update-locale LANG=en_US.UTF-8 2>/dev/null
     fi
-
-    echo -e "${gl_lv}Locale set to: $new_locale${gl_bai}"
+    echo "Locales configured."
 }
 
-# Fail2ban management
-manage_fail2ban() {
-    echo -e "\n${gl_huang}Fail2ban Management:${gl_bai}"
-    echo -e "  ${gl_lv}1.${gl_bai} Install Fail2ban"
-    echo -e "  ${gl_lv}2.${gl_bai} Check Fail2ban Status"
-    echo -e "  ${gl_lv}3.${gl_bai} View Banned IPs (SSH)"
-    echo -e "  ${gl_lv}4.${gl_bai} Uninstall Fail2ban"
-    echo -e "  ${gl_hong}0.${gl_bai} Cancel"
-    read -p "Please select: " f2b_choice
+toggle_ipv6() {
+    clear
+    echo -e "IPv6 Networking Management:"
+    echo -e "  ${gl_lv}1.${gl_bai} Enable IPv6 Support"
+    echo -e "  ${gl_lv}2.${gl_bai} Disable IPv6 Support"
+    read -p "Select: " ip_ch
 
-    case $f2b_choice in
+    case "$ip_ch" in
         1)
-            echo -e "${gl_huang}Installing Fail2ban...${gl_bai}"
-            if command -v apt &>/dev/null; then
-                apt install -y fail2ban
-            elif command -v dnf &>/dev/null; then
-                dnf install -y fail2ban
-            elif command -v yum &>/dev/null; then
-                yum install -y fail2ban
-            fi
-            systemctl enable fail2ban 2>/dev/null
-            systemctl start fail2ban 2>/dev/null
-            echo -e "${gl_lv}Fail2ban installed and started.${gl_bai}"
+            sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.conf
+            sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.conf
+            sysctl -p >/dev/null 2>&1
+            echo "IPv6 protocol enabled."
+            ;;
+        2)
+            echo "net.ipv6.conf.all.disable_ipv6 = 1" >> /etc/sysctl.conf
+            echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf
+            sysctl -p >/dev/null 2>&1
+            echo "IPv6 protocol disabled."
+            ;;
+    esac
+}
+
+fail2ban_panel() {
+    clear
+    echo -e "Fail2ban SSH brute-force defense console:"
+    echo -e "  ${gl_lv}1.${gl_bai} Install Fail2ban daemon"
+    echo -e "  ${gl_lv}2.${gl_bai} Monitor current Fail2ban status"
+    echo -e "  ${gl_lv}3.${gl_bai} Completely uninstall Fail2ban"
+    read -p "Select: " f_ch
+
+    case "$f_ch" in
+        1)
+            install_pkgs fail2ban
+            sys_service start fail2ban 2>/dev/null
+            sys_service enable fail2ban 2>/dev/null
             ;;
         2)
             if command -v fail2ban-client &>/dev/null; then
-                fail2ban-client status
+                fail2ban-client status sshd 2>/dev/null || fail2ban-client status
             else
-                echo -e "${gl_hong}Fail2ban is not installed.${gl_bai}"
+                echo "Fail2ban is not installed."
             fi
             ;;
         3)
-            if command -v fail2ban-client &>/dev/null; then
-                fail2ban-client status sshd 2>/dev/null || echo "SSH jail not configured."
-            else
-                echo -e "${gl_hong}Fail2ban is not installed.${gl_bai}"
-            fi
+            remove_pkgs fail2ban
+            rm -rf /etc/fail2ban
             ;;
-        4)
-            echo -e "${gl_huang}Uninstalling Fail2ban...${gl_bai}"
-            systemctl stop fail2ban 2>/dev/null
-            if command -v apt &>/dev/null; then
-                apt remove -y fail2ban && apt purge -y fail2ban
-            elif command -v dnf &>/dev/null; then
-                dnf remove -y fail2ban
-            elif command -v yum &>/dev/null; then
-                yum remove -y fail2ban
-            fi
-            echo -e "${gl_lv}Fail2ban uninstalled.${gl_bai}"
-            ;;
-        0) return ;;
-        *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
     esac
 }
 
-# Main menu
-system_tools_menu() {
+sys_menu() {
     while true; do
-        echo ""
-        echo -e "${gl_bold}${gl_kjlan}============ System Tools ============${gl_bai}"
-        echo -e "${gl_kjlan}  --- Network Configuration ---${gl_bai}"
-        echo -e "  ${gl_lv}1.${gl_bai} Change Hostname"
-        echo -e "  ${gl_lv}2.${gl_bai} Change DNS"
-        echo -e "  ${gl_lv}3.${gl_bai} Change SSH Port"
-        echo -e "  ${gl_lv}4.${gl_bai} Toggle IPv6"
-        echo -e "${gl_kjlan}  --- System Configuration ---${gl_bai}"
-        echo -e "  ${gl_lv}5.${gl_bai} Change Timezone"
-        echo -e "  ${gl_lv}6.${gl_bai} Set Locale"
-        echo -e "  ${gl_lv}7.${gl_bai} Manage Swap"
-        echo -e "  ${gl_lv}8.${gl_bai} Manage Crontab"
-        echo -e "${gl_kjlan}  --- Security ---${gl_bai}"
-        echo -e "  ${gl_lv}9.${gl_bai} Change Root Password"
-        echo -e "  ${gl_lv}10.${gl_bai} Manage Root SSH Login"
-        echo -e "  ${gl_lv}11.${gl_bai} Manage Fail2ban"
-        echo ""
-        echo -e "  ${gl_hong}0.${gl_bai} Return to Main Menu"
-        echo -e "${gl_kjlan}=======================================${gl_bai}"
-        read -p "Please enter your choice: " choice
-
-        case $choice in
-            1) change_hostname ;;
-            2) change_dns ;;
-            3) change_ssh_port ;;
-            4) toggle_ipv6 ;;
-            5) change_timezone ;;
-            6) set_locale ;;
-            7) manage_swap ;;
-            8) manage_crontab ;;
-            9) change_root_password ;;
-            10) manage_root_ssh ;;
-            11) manage_fail2ban ;;
-            0) return ;;
-            *) echo -e "${gl_hong}Invalid option!${gl_bai}" ;;
-        esac
-
-        echo ""
-        echo -e "${gl_huang}Press any key to continue...${gl_bai}"
-        read -n 1 -s
         clear
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+        echo -e "                 $(get_sys_msg 'title')                                 "
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+        show_system_overview
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_lv}1.${gl_bai} $(get_sys_msg 'opt_1')          ${gl_lv}6.${gl_bai} $(get_sys_msg 'opt_6')"
+        echo -e "  ${gl_lv}2.${gl_bai} $(get_sys_msg 'opt_2')          ${gl_lv}7.${gl_bai} $(get_sys_msg 'opt_7')"
+        echo -e "  ${gl_lv}3.${gl_bai} $(get_sys_msg 'opt_3')          ${gl_lv}8.${gl_bai} $(get_sys_msg 'opt_8')"
+        echo -e "  ${gl_lv}4.${gl_bai} $(get_sys_msg 'opt_4')          ${gl_lv}9.${gl_bai} $(get_sys_msg 'opt_9')"
+        echo -e "  ${gl_lv}5.${gl_bai} $(get_sys_msg 'opt_5')         ${gl_lv}10.${gl_bai} $(get_sys_msg 'opt_10')"
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_hong}0.${gl_bai} $(get_msg 'press_any_key')"
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+
+        read -p "Selection: " sub_ch
+        case "$sub_ch" in
+            1) upd_hostname; break_end ;;
+            2) upd_dns; break_end ;;
+            3) upd_timezone; break_end ;;
+            4) read -p "Swap Size in MB: " s_mb && add_swap "$s_mb"; break_end ;;
+            5) upd_root_pwd; break_end ;;
+            6) toggle_ssh_root; break_end ;;
+            7) upd_ssh_port; break_end ;;
+            8) upd_locale; break_end ;;
+            9) toggle_ipv6; break_end ;;
+            10) fail2ban_panel; break_end ;;
+            0) return ;;
+            *) echo -e "${gl_hong}$(get_msg 'invalid_selection')${gl_bai}"; sleep 2 ;;
+        esac
     done
 }
 
-system_tools_menu
+sys_menu
