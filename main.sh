@@ -1,107 +1,122 @@
 #!/bin/bash
-# VPS Scripts - Main Menu
-# A comprehensive VPS management toolkit
-# Repository: https://github.com/LoveDoLove/vps-scripts
+# main.sh
+# Main menu entrypoint for LoveDoLove VPS Toolkit
+# Bilingual Support (CN / EN)
 
-# Set your GitHub repository raw base URL for script downloads
+# Define GitHub raw repo address for remote scripts loading
+# Target script path
+SCRIPT_PATH=$(dirname "$(readlink -f "$0")")
+
+# Fallback base URL for remote execute (curl/wget download run)
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/scripts"
 
-# Color definitions
-gl_hong='\033[31m'
-gl_lv='\033[32m'
-gl_huang='\033[33m'
-gl_lan='\033[34m'
-gl_zi='\033[35m'
-gl_kjlan='\033[96m'
-gl_bai='\033[0m'
-gl_bold='\033[1m'
+# Load local lib if exists, else pull remotely
+if [ -f "$SCRIPT_PATH/lib/common.sh" ]; then
+    . "$SCRIPT_PATH/lib/common.sh"
+else
+    # Remote fallback download logic
+    mkdir -p /tmp/vps-scripts/lib 2>/dev/null
+    curl -sSL "https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/lib/common.sh" -o /tmp/vps-scripts/lib/common.sh
+    . /tmp/vps-scripts/lib/common.sh
+fi
 
-clear
+# Multi-platform language detector
+detect_language "$1"
+user_agreement
 
-# Function: Download and run a script
-run_script() {
-    local script_name="$1"
-    local script_dir
-    script_dir="$(cd "$(dirname "$0")" && pwd)/scripts"
-    local script_path="$script_dir/$script_name"
-    local github_raw_url="$GITHUB_RAW_BASE/$script_name"
-
-    clear
-
-    # Auto-download the script if not present
-    if [ ! -f "$script_path" ]; then
-        echo -e "${gl_huang}[Info] $script_name not found. Downloading from GitHub...${gl_bai}"
-        mkdir -p "$script_dir"
-        if command -v curl >/dev/null 2>&1; then
-            curl -fsSL "$github_raw_url" -o "$script_path"
-        elif command -v wget >/dev/null 2>&1; then
-            wget -q "$github_raw_url" -O "$script_path"
-        else
-            echo -e "${gl_hong}Neither curl nor wget is available. Please install one to proceed.${gl_bai}"
-            return
-        fi
-        chmod +x "$script_path"
-    fi
-
-    if [ -f "$script_path" ]; then
-        bash "$script_path"
-    else
-        echo -e "${gl_hong}Failed to download $script_name from GitHub.${gl_bai}"
-    fi
-}
-
-# Function: Display the main menu
+# Menu builder
 main_menu() {
-    echo -e "${gl_bold}${gl_kjlan}"
-    echo "==========================================================="
-    echo "                  VPS Scripts Main Menu                     "
-    echo "==========================================================="
-    echo -e "${gl_bai}"
-    echo -e "  ${gl_lv}1.${gl_bai}   系 统 信 息 查 询"
-    echo -e "  ${gl_lv}2.${gl_bai}   系 统 更 新"
-    echo -e "  ${gl_lv}3.${gl_bai}   系 统 清 理"
-    echo -e "  ${gl_lv}4.${gl_bai}   基 础 工 具"
-    echo -e "  ${gl_lv}5.${gl_bai}   BBR 管 理"
-    echo -e "  ${gl_lv}6.${gl_bai}   Docker 管 理"
-    echo -e "  ${gl_lv}7.${gl_bai}   WARP 管 理"
-    echo -e "  ${gl_lv}8.${gl_bai}   测 试 脚 本 合 集"
-    echo -e "  ${gl_lv}9.${gl_bai}   甲 骨 文 云 脚 本 合 集"
-    echo -e "  ${gl_lv}10.${gl_bai}  系 统 工 具"
-    echo ""
-    echo -e "  ${gl_hong}0.${gl_bai}   Exit"
-    echo -e "${gl_kjlan}-----------------------------------------------------------${gl_bai}"
+    clear
+    get_ip_address
+    echo -e "${gl_kjlan}========================================================================${gl_bai}"
+    echo -e "${gl_bold}               LoveDoLove VPS Management Toolkit                      ${gl_bai}"
+    echo -e "               Version: 1.0.0 | Language: $LANG_ENV                    "
+    echo -e "${gl_kjlan}========================================================================${gl_bai}"
+
+    if [[ "$LANG_ENV" == "CN" ]]; then
+        echo -e " 本機 IPv4: ${gl_huang}${local_ipv4:-未偵測}${gl_bai} | 公網 IPv4: ${gl_huang}${public_ipv4:-無}${gl_bai}"
+        echo -e " 公網 IPv6: ${gl_huang}${public_ipv6:-無}${gl_bai}"
+        echo -e " 系統資訊:  $(uname -s -r -m)"
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_lv}1.${gl_bai} 系統更新與基礎工具 (Update & Basic Tools)"
+        echo -e "  ${gl_lv}2.${gl_bai} 防火牆與高級安全管理 (Firewall & WAF Security)"
+        echo -e "  ${gl_lv}3.${gl_bai} 核心升級與 BBR 加速 (Kernel & BBR Acceleration)"
+        echo -e "  ${gl_lv}4.${gl_bai} SSL 憑證管理 (SSL Certificate Manager)"
+        echo -e "  ${gl_lv}5.${gl_bai} LDNMP 建站管理面板 (LDNMP Web Stack Docker)"
+        echo -e "  ${gl_lv}6.${gl_bai} Docker 環境與容器管理 (Docker & Containers)"
+        echo -e "  ${gl_lv}7.${gl_bai} Docker 軟體/應用市場 (Docker Application Store)"
+        echo -e "  ${gl_lv}8.${gl_bai} FRP 內網穿透與監控告警 (FRP Proxy & Prometheus)"
+        echo -e "  ${gl_lv}9.${gl_bai} 系統清理、備份與定時任務 (Backup, Cleanup & Cron)"
+        echo -e "  ${gl_lv}10.${gl_bai} 服務器網絡測試與性能 Bench (Network tests & Benchmarks)"
+        echo -e "  ${gl_lv}11.${gl_bai} 網絡輔助與優化工具 (DNS, WARP, Routing Preferences)"
+        echo -e "  ${gl_lv}12.${gl_bai} 物理/雲服務器一鍵 DD 重裝 (Server OS Reinstallation DD)"
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_hong}0.${gl_bai} 退出腳本 (Exit)"
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+    else
+        echo -e " Local IPv4: ${gl_huang}${local_ipv4:-N/A}${gl_bai} | Public IPv4: ${gl_huang}${public_ipv4:-N/A}${gl_bai}"
+        echo -e " Public IPv6: ${gl_huang}${public_ipv6:-N/A}${gl_bai}"
+        echo -e " OS Info:    $(uname -s -r -m)"
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_lv}1.${gl_bai} System Update & Basic Tools"
+        echo -e "  ${gl_lv}2.${gl_bai} Firewall & WAF Security"
+        echo -e "  ${gl_lv}3.${gl_bai} Kernel & BBR Tuning"
+        echo -e "  ${gl_lv}4.${gl_bai} SSL Certificate Management"
+        echo -e "  ${gl_lv}5.${gl_bai} LDNMP Web Stack Docker Control"
+        echo -e "  ${gl_lv}6.${gl_bai} Docker & Container Management"
+        echo -e "  ${gl_lv}7.${gl_bai} Docker App Store (Applications)"
+        echo -e "  ${gl_lv}8.${gl_bai} FRP Tunneling & Monitoring (Grafana/Prometheus)"
+        echo -e "  ${gl_lv}9.${gl_bai} System Cleanup, Backups & Cronjobs"
+        echo -e "  ${gl_lv}10.${gl_bai} Network Speedtests & Benchmarks"
+        echo -e "  ${gl_lv}11.${gl_bai} DNS Optimization & Cloudflare WARP tools"
+        echo -e "  ${gl_lv}12.${gl_bai} Cloud OS Direct DD Reinstallation"
+        echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
+        echo -e "  ${gl_hong}0.${gl_bai} Quit Toolkit"
+        echo -e "${gl_kjlan}========================================================================${gl_bai}"
+    fi
 }
 
-# Function: Handle user selection
-handle_selection() {
-    case $1 in
-        1) run_script "system_info.sh" ;;
-        2) run_script "system_update.sh" ;;
-        3) run_script "system_clean.sh" ;;
-        4) run_script "basic_tools.sh" ;;
-        5) run_script "bbr_manage.sh" ;;
-        6) run_script "docker_manage.sh" ;;
-        7) run_script "warp_manage.sh" ;;
-        8) run_script "test_scripts.sh" ;;
-        9) run_script "oracle_cloud.sh" ;;
-        10) run_script "system_tools.sh" ;;
-        0)
-            echo -e "${gl_lv}Exiting...${gl_bai}"
-            exit 0
-        ;;
-        *)
-            echo -e "${gl_hong}Invalid selection! Please enter a valid option.${gl_bai}"
-        ;;
+load_module() {
+    local module_name="$1"
+    local local_file="$SCRIPT_PATH/scripts/${module_name}.sh"
+
+    if [ -f "$local_file" ]; then
+        bash "$local_file" "$LANG_ENV"
+    else
+        echo -e "${gl_huang}Downloading module ${module_name} remotely...${gl_bai}"
+        mkdir -p /tmp/vps-scripts/scripts 2>/dev/null
+        curl -sSL "${GITHUB_RAW_BASE}/${module_name}.sh" -o "/tmp/vps-scripts/scripts/${module_name}.sh"
+        bash "/tmp/vps-scripts/scripts/${module_name}.sh" "$LANG_ENV"
+    fi
+}
+
+# Process options
+handle_choice() {
+    case "$1" in
+        1) load_module "system_tools" ;;
+        2) load_module "firewall_manage" ;;
+        3) load_module "kernel_manage" ;;
+        4) load_module "ssl_manage" ;;
+        5) load_module "web_manage" ;;
+        6) load_module "docker_manage" ;;
+        7) load_module "app_store" ;;
+        8) load_module "frp_manage" ;;
+        9) load_module "backup_manage" ;;
+        10) load_module "test_scripts" ;;
+        11) load_module "warp_manage" ;;
+        12) load_module "dd_system" ;;
+        0) clear; exit 0 ;;
+        *) echo -e "${gl_hong}$(get_msg 'invalid_selection')${gl_bai}"; sleep 2 ;;
     esac
-    echo ""
-    echo -e "${gl_huang}Press any key to return to the main menu...${gl_bai}"
-    read -n 1 -s
 }
 
-# Main loop
+# Main Loop
 while true; do
     main_menu
-    read -p "Please enter your choice [0-10]: " choice
-    handle_selection "$choice"
-    clear
+    if [[ "$LANG_ENV" == "CN" ]]; then
+        read -p "請輸入您的選擇 [0-12]: " choice
+    else
+        read -p "Please enter your choice [0-12]: " choice
+    fi
+    handle_choice "$choice"
 done
