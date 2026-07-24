@@ -50,6 +50,7 @@ main_menu() {
         echo -e "  ${gl_lv}10.${gl_bai} 服務器網絡測試與性能 Bench (Network tests & Benchmarks)"
         echo -e "  ${gl_lv}11.${gl_bai} 網絡輔助與優化工具 (DNS, WARP, Routing Preferences)"
         echo -e "  ${gl_lv}12.${gl_bai} 物理/雲服務器一鍵 DD 重裝 (Server OS Reinstallation DD)"
+        echo -e "  ${gl_lv}13.${gl_bai} 甲骨文雲專屬組態優化工具 (Oracle Cloud Instance Specifics)"
         echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
         echo -e "  ${gl_hong}0.${gl_bai} 退出腳本 (Exit)"
         echo -e "${gl_kjlan}========================================================================${gl_bai}"
@@ -70,6 +71,7 @@ main_menu() {
         echo -e "  ${gl_lv}10.${gl_bai} Network Speedtests & Benchmarks"
         echo -e "  ${gl_lv}11.${gl_bai} DNS Optimization & Cloudflare WARP tools"
         echo -e "  ${gl_lv}12.${gl_bai} Cloud OS Direct DD Reinstallation"
+        echo -e "  ${gl_lv}13.${gl_bai} Oracle Cloud Instance Specific Optimizations"
         echo -e "${gl_kjlan}------------------------------------------------------------------------${gl_bai}"
         echo -e "  ${gl_hong}0.${gl_bai} Quit Toolkit"
         echo -e "${gl_kjlan}========================================================================${gl_bai}"
@@ -105,6 +107,7 @@ handle_choice() {
         10) load_module "test_scripts" ;;
         11) load_module "warp_manage" ;;
         12) load_module "dd_system" ;;
+        13) load_module "oracle_cloud" ;;
         0) clear; exit 0 ;;
         *) echo -e "${gl_hong}$(get_msg 'invalid_selection')${gl_bai}"; sleep 2 ;;
     esac
@@ -114,9 +117,9 @@ handle_choice() {
 while true; do
     main_menu
     if [[ "$LANG_ENV" == "CN" ]]; then
-        read -p "請輸入您的選擇 [0-12]: " choice
+        read -p "請輸入您的選擇 [0-13]: " choice
     else
-        read -p "Please enter your choice [0-12]: " choice
+        read -p "Please enter your choice [0-13]: " choice
     fi
     handle_choice "$choice"
 done

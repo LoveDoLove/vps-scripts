@@ -26,3 +26,6 @@ This file contains behavioral design rules and operational parameters for AI cod
 
 7. **Docker App Store Extensions**
    - The application store (`scripts/app_store.sh`) contains one-click standalone templates for MySQL, Redis, phpMyAdmin, Nginx Proxy Manager, Portainer, 1Panel, Sandboxed Environments (Node/Python CLI), WordPress Stack, Postgres + pgAdmin, Standalone Nginx, and Vaultwarden. Ensure any new template conforms to containerized isolation best practices.
+
+8. **Oracle Cloud Integration**
+   - Instanced configurations for Oracle Cloud components (`scripts/oracle_cloud.sh`) are integrated directly under Option 13 in `main.sh`. Make sure local ports configuration, live growth partitions, oracle agents cleaning, and bespoke DD network tools installer paths use the standard helper utilities and support Traditional Chinese & English output modes.
