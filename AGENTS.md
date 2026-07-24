@@ -21,5 +21,8 @@ This file contains behavioral design rules and operational parameters for AI cod
 4. **Security Warnings**
    - When modifying critical network settings (such as custom SSH port changes, firewall flushes, or DD operating system replacements), always print explicit warn strings warning users to check their cloud provider firewalls before execution to prevent server disconnections.
 
-5. **No Local Dependencies Assumptions**
-   - Because scripts can run directly via remote retrieval (`bash <(curl -sSL https://raw.githubusercontent.com/.../script.sh)`), always assume the current workspace may be stored in dry-runs under temporary locations like `/tmp/`. The import path logic in files must dynamically check for local paths first, then fall back to downloading missing libraries from the raw GitHub address if running in direct execution mode.
+6. **GH_PROXY Configuration**
+   - By default, the toolkit utilizes `https://gh.kejilion.pro/` as the default `GH_PROXY` in `lib/common.sh` for optimizing raw files downloaded from GitHub in mainland China. Ensure this parameter is handled across all modules fetching external resources.
+
+7. **Docker App Store Extensions**
+   - The application store (`scripts/app_store.sh`) contains one-click standalone templates for MySQL, Redis, phpMyAdmin, Nginx Proxy Manager, Portainer, 1Panel, Sandboxed Environments (Node/Python CLI), WordPress Stack, Postgres + pgAdmin, Standalone Nginx, and Vaultwarden. Ensure any new template conforms to containerized isolation best practices.
