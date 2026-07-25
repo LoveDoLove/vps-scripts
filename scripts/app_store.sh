@@ -34,6 +34,7 @@ get_store_msg() {
                 "enter_port") echo "請輸入容器對外公開映射端口 [默認: " ;;
                 "enter_pass") echo "請自定義資料庫/服務訪問密碼: " ;;
                 "app_inst_success") echo "應用程式佈署容器完成！啟動成功。" ;;
+                "port_taken_err") echo "錯誤！端口已被佔用，請重新選擇映射端口。" ;;
             esac
             ;;
         *) # EN
@@ -53,6 +54,7 @@ get_store_msg() {
                 "enter_port") echo "Enter external network mapping port [Default: " ;;
                 "enter_pass") echo "Enter secure password for service administrator: " ;;
                 "app_inst_success") echo "Application Container deployed & booted successfully!" ;;
+                "port_taken_err") echo "Error! Target port is already in use, please choose another mapping port." ;;
             esac
             ;;
     esac
@@ -67,10 +69,25 @@ ensure_docker() {
     fi
 }
 
+# Helper wrapper for port inputs
+read_validate_port() {
+    local default_port="$1"
+    local port_val
+    while true; do
+        read -p "$(get_store_msg 'enter_port') $default_port]: " port_val
+        port_val=${port_val:-$default_port}
+        if check_port_taken "$port_val"; then
+            echo -e "${gl_hong}$(get_store_msg 'port_taken_err')${gl_bai}"
+        else
+            echo "$port_val"
+            return
+        fi
+    done
+}
+
 deploy_mysql() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 3306]: " port
-    port=${port:-3306}
+    local port=$(read_validate_port 3306)
     read -p "$(get_store_msg 'enter_pass')" password
     password=${password:-"sql_pwd_$(openssl rand -hex 4)"}
 
@@ -89,8 +106,7 @@ deploy_mysql() {
 
 deploy_redis() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 6379]: " port
-    port=${port:-6379}
+    local port=$(read_validate_port 6379)
     read -p "$(get_store_msg 'enter_pass')" password
 
     docker stop redis-standalone 2>/dev/null
@@ -115,8 +131,7 @@ deploy_redis() {
 
 deploy_phpmyadmin() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 8080]: " port
-    port=${port:-8080}
+    local port=$(read_validate_port 8080)
 
     docker stop phpmyadmin-standalone 2>/dev/null
     docker rm phpmyadmin-standalone 2>/dev/null
@@ -133,6 +148,11 @@ deploy_phpmyadmin() {
 
 deploy_npm() {
     ensure_docker
+    if check_port_taken 80 || check_port_taken 81 || check_port_taken 443; then
+         echo -e "${gl_hong}Warning: Standard HTTP (80/443/81) ports are in use! Nginx Proxy Manager setup failed.${gl_bai}"
+         return 1
+    fi
+
     docker stop npm-standalone 2>/dev/null
     docker rm npm-standalone 2>/dev/null
     docker run -d \
@@ -151,6 +171,10 @@ deploy_npm() {
 
 deploy_portainer() {
     ensure_docker
+    if check_port_taken 8000 || check_port_taken 9443; then
+         echo -e "${gl_hong}Warning: Default Portainer ports (8000/9443) are already bound.${gl_bai}"
+         return 1
+    fi
     docker stop portainer 2>/dev/null
     docker rm portainer 2>/dev/null
     docker volume create portainer_data
@@ -185,8 +209,7 @@ deploy_environments() {
 
 deploy_wordpress_stack() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 8000]: " port
-    port=${port:-8000}
+    local port=$(read_validate_port 8000)
     read -p "$(get_store_msg 'enter_pass')" db_pwd
     db_pwd=${db_pwd:-"admin_db_$(openssl rand -hex 4)"}
 
@@ -230,8 +253,7 @@ EOF
 
 deploy_postgres() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 5432]: " port
-    port=${port:-5432}
+    local port=$(read_validate_port 5432)
     read -p "$(get_store_msg 'enter_pass')" password
     password=${password:-"postgres_pwd_$(openssl rand -hex 4)"}
 
@@ -244,26 +266,27 @@ deploy_postgres() {
         --restart always \
         postgres:latest
 
-    # Deploy companion pgAdmin tool at port 5050
-    docker stop pgadmin-companion 2>/dev/null
-    docker rm pgadmin-companion 2>/dev/null
-    docker run -d \
-        --name pgadmin-companion \
-        -p 5050:80 \
-        -e PGADMIN_DEFAULT_EMAIL="admin@postgres.com" \
-        -e PGADMIN_DEFAULT_PASSWORD="$password" \
-        --restart always \
-        dpage/pgadmin4:latest
+    # Deploy companion pgAdmin tool at port 5050 if free
+    if ! check_port_taken 5050; then
+        docker stop pgadmin-companion 2>/dev/null
+        docker rm pgadmin-companion 2>/dev/null
+        docker run -d \
+            --name pgadmin-companion \
+            -p 5050:80 \
+            -e PGADMIN_DEFAULT_EMAIL="admin@postgres.com" \
+            -e PGADMIN_DEFAULT_PASSWORD="$password" \
+            --restart always \
+            dpage/pgadmin4:latest
+        echo "pgAdmin Console Port: http://local_ip:5050 | Login: admin@postgres.com / $password"
+    fi
 
     echo -e "${gl_lv}$(get_store_msg 'app_inst_success')${gl_bai}"
     echo "Postgres Port: $port | User: postgres | Pass: $password"
-    echo "pgAdmin Console Port: http://local_ip:5050 | Login: admin@postgres.com / $password"
 }
 
 deploy_standalone_nginx() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 8081]: " port
-    port=${port:-8081}
+    local port=$(read_validate_port 8081)
 
     docker stop nginx-standalone 2>/dev/null
     docker rm nginx-standalone 2>/dev/null
@@ -279,8 +302,7 @@ deploy_standalone_nginx() {
 
 deploy_vaultwarden() {
     ensure_docker
-    read -p "$(get_store_msg 'enter_port') 8088]: " port
-    port=${port:-8088}
+    local port=$(read_validate_port 8088)
 
     docker stop vaultwarden-standalone 2>/dev/null
     docker rm vaultwarden-standalone 2>/dev/null

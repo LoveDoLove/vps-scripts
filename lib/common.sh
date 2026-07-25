@@ -297,8 +297,21 @@ prefer_ipv4() {
 get_ip_address() {
     local_ipv4=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K[^ ]+' || \
                  hostname -I 2>/dev/null | awk '{print $1}')
-    public_ipv4=$(curl -s --max-time 3 https://ipinfo.io/ip 2>/dev/null)
-    public_ipv6=$(curl -s --max-time 1 https://v6.ipinfo.io/ip 2>/dev/null)
+    public_ipv4=$(curl -s --connect-timeout 3 --max-time 5 https://ipinfo.io/ip 2>/dev/null)
+    public_ipv6=$(curl -s --connect-timeout 2 --max-time 3 https://v6.ipinfo.io/ip 2>/dev/null)
+}
+
+# Verify if a port is already taken/in use locally
+check_port_taken() {
+    local port="$1"
+    if command -v ss &>/dev/null; then
+        ss -tuln | grep -q ":$port "
+    elif command -v netstat &>/dev/null; then
+        netstat -tuln | grep -q ":$port "
+    else
+        # Fallback raw bash sockets checker
+        (echo > /dev/tcp/127.0.0.1/"$port") &>/dev/null
+    fi
 }
 
 # User license agreement flow
