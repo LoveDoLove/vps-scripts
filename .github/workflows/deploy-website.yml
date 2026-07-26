@@ -34,8 +34,7 @@ jobs:
         working-directory: website
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          workingDirectory: website
-          command: pages deploy .vitepress/dist --project-name vps-scripts
+        run: pnpm exec wrangler pages deploy .vitepress/dist --project-name vps-scripts
+        working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
