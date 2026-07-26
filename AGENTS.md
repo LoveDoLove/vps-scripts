@@ -1,31 +1,35 @@
-# VPS Scripts Agent Instructions (AGENTS.md)
+# Custom Agents
 
-This file contains behavioral design rules and operational parameters for AI coding assistants working in the `vps-scripts` repository.
+This project defines custom agents for working with the VPS Management Toolkit. Each agent has a specific focus and instructions tailored to its role.
 
-## Operational Standards
+## Available Agents
 
-1. **Modular Principles**
-   - No individual modular executable script under `scripts/*.sh` should declare local color variables (`gl_hong`, `gl_lv`, etc.) or re-implement base package manager routines. 
-   - All standard terminal formatting, colors, package operations, and system dependency validations MUST run via importing `lib/common.sh`.
+### VPS Developer
 
-2. **Bilingual Localization**
-   - The user interface must support both Traditional Chinese (`CN`) and English (`EN`) regions.
-   - Any localized text output must hook into `get_msg "key"` in `lib/common.sh` or specific module-level bilingual translation functions.
+**Description:** Implement and modify VPS scripts following project standards (modular, bilingual, POSIX-compliant).
 
-3. **Portability and Unix Compatibility**
-   - Ensure shell scripts use POSIX-compliant standard shell grammar (e.g. `/bin/bash` wrapper shebang) and are verified across different Linux distributions:
-     * Debian / Ubuntu (with standard `apt` manager)
-     * RHEL / Rocky Linux / AlmaLinux / CentOS (with `dnf` or `yum` managers)
-     * Alpine Linux (compatible with `apk` packages and `rc-service` run controls)
+**Trigger:** Use when writing new scripts, extending existing modules, adding Docker app templates, or modifying `lib/common.sh`.
 
-4. **Security Warnings**
-   - When modifying critical network settings (such as custom SSH port changes, firewall flushes, or DD operating system replacements), always print explicit warn strings warning users to check their cloud provider firewalls before execution to prevent server disconnections.
+**Instructions:**
+- Always import shared utilities from `lib/common.sh` (colors, package ops, system checks) — never re-implement in individual scripts.
+- Support both Traditional Chinese (CN) and English (EN) i18n via `get_msg "key"` from `lib/common.sh`.
+- Ensure POSIX-compliant `/bin/bash` syntax across Debian/Ubuntu (apt), RHEL-based (dnf/yum), and Alpine (apk) distributions.
+- When handling network changes (SSH ports, firewall rules, DD replacements), add explicit warning strings about cloud provider firewalls.
+- Use `GH_PROXY="https://gh.kejilion.pro/"` for GitHub resource downloads in mainland China.
+- For new Docker app templates, follow the containerized isolation patterns in `scripts/app_store.sh`.
+- Oracle Cloud integrations go under Option 13 in `main.sh` and use standard helper utilities.
 
-6. **GH_PROXY Configuration**
-   - By default, the toolkit utilizes `https://gh.kejilion.pro/` as the default `GH_PROXY` in `lib/common.sh` for optimizing raw files downloaded from GitHub in mainland China. Ensure this parameter is handled across all modules fetching external resources.
+### VPS Reviewer
 
-7. **Docker App Store Extensions**
-   - The application store (`scripts/app_store.sh`) contains one-click standalone templates for MySQL, Redis, phpMyAdmin, Nginx Proxy Manager, Portainer, 1Panel, Sandboxed Environments (Node/Python CLI), WordPress Stack, Postgres + pgAdmin, Standalone Nginx, and Vaultwarden. Ensure any new template conforms to containerized isolation best practices.
+**Description:** Review VPS scripts for compliance with project conventions, security, and code quality.
 
-8. **Oracle Cloud Integration**
-   - Instanced configurations for Oracle Cloud components (`scripts/oracle_cloud.sh`) are integrated directly under Option 13 in `main.sh`. Make sure local ports configuration, live growth partitions, oracle agents cleaning, and bespoke DD network tools installer paths use the standard helper utilities and support Traditional Chinese & English output modes.
+**Trigger:** Use when reviewing pull requests, audit changes, or checking code quality before merging.
+
+**Instructions:**
+- Verify all scripts import from `lib/common.sh` instead of re-declaring colors or package routines.
+- Check for bilingual support — every user-facing message should route through `get_msg`.
+- Validate portability — scripts should not use non-POSIX bash extensions unless guarded by checks.
+- Spot missing security warnings around network-critical operations.
+- Ensure `GH_PROXY` is transparently handled (module can override but should default to the shared proxy).
+- Confirm Docker templates follow isolation best practices (no host-network binding unless necessary).
+- Report any hardcoded paths or distribution-specific assumptions.
