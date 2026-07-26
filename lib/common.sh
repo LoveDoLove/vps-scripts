@@ -295,7 +295,7 @@ prefer_ipv4() {
 
 # Get public and local networks
 get_ip_address() {
-    local_ipv4=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K[^ ]+' || \
+    local_ipv4=$(ip route get 8.8.8.8 2>/dev/null | sed -n 's/.*src \([^ ]*\).*/\1/p' || \
                  hostname -I 2>/dev/null | awk '{print $1}')
     public_ipv4=$(curl -s --connect-timeout 3 --max-time 5 https://ipinfo.io/ip 2>/dev/null)
     public_ipv6=$(curl -s --connect-timeout 2 --max-time 3 https://v6.ipinfo.io/ip 2>/dev/null)

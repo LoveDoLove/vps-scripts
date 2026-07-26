@@ -129,7 +129,7 @@ deploy_wordpress() {
     unzip wordpress.zip && mv wordpress/* . && rm -rf wordpress wordpress.zip
 
     # Auto create MySQL database
-    local db_root_pwd=$(grep -oP 'MYSQL_ROOT_PASSWORD:\s*\K.*' /home/web/docker-compose.yml | tr -d '[:space:]')
+    local db_root_pwd=$(sed -n 's/.*MYSQL_ROOT_PASSWORD:[[:space:]]*//p' /home/web/docker-compose.yml | tr -d '[:space:]')
     local dbname=$(echo "$domain" | sed -e 's/[^A-Za-z0-9]/_/g')
     docker exec mysql mysql -u root -p"$db_root_pwd" -e "CREATE DATABASE IF NOT EXISTS $dbname; GRANT ALL PRIVILEGES ON $dbname.* TO 'root'@'%';" 2>/dev/null
 
@@ -222,7 +222,7 @@ list_sites() {
     echo -e "\n--- Hosted Sites ---"
     ls -1 /home/web/conf.d/ 2>/dev/null | grep '.conf' | grep -v 'default.conf'
     echo -e "--- Databases ---"
-    local db_root_pwd=$(grep -oP 'MYSQL_ROOT_PASSWORD:\s*\K.*' /home/web/docker-compose.yml | tr -d '[:space:]')
+    local db_root_pwd=$(sed -n 's/.*MYSQL_ROOT_PASSWORD:[[:space:]]*//p' /home/web/docker-compose.yml | tr -d '[:space:]')
     docker exec mysql mysql -u root -p"$db_root_pwd" -e "SHOW DATABASES;" 2>/dev/null | grep -Ev "Database|schema"
     echo ""
 }
@@ -238,7 +238,7 @@ delete_site() {
     rm -f "/home/web/certs/${domain}_cert.pem"
     rm -f "/home/web/certs/${domain}_key.pem"
 
-    local db_root_pwd=$(grep -oP 'MYSQL_ROOT_PASSWORD:\s*\K.*' /home/web/docker-compose.yml | tr -d '[:space:]')
+    local db_root_pwd=$(sed -n 's/.*MYSQL_ROOT_PASSWORD:[[:space:]]*//p' /home/web/docker-compose.yml | tr -d '[:space:]')
     local dbname=$(echo "$domain" | sed -e 's/[^A-Za-z0-9]/_/g')
     docker exec mysql mysql -u root -p"$db_root_pwd" -e "DROP DATABASE IF EXISTS $dbname;" 2>/dev/null
 
