@@ -7,9 +7,6 @@
 # Target script path
 SCRIPT_PATH=$(dirname "$(readlink -f "$0")")
 
-# Fallback base URL for remote execute (curl/wget download run)
-GITHUB_RAW_BASE="https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/scripts"
-
 # Load local lib if exists, else pull remotely
 if [ -f "$SCRIPT_PATH/lib/common.sh" ]; then
     . "$SCRIPT_PATH/lib/common.sh"
@@ -19,6 +16,10 @@ else
     curl -sSL "https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/lib/common.sh" -o /tmp/vps-scripts/lib/common.sh
     . /tmp/vps-scripts/lib/common.sh
 fi
+
+# Fallback base URL for remote script loading
+# NOTE: Must be set AFTER sourcing common.sh (which defines GITHUB_RAW_BASE without /scripts)
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/LoveDoLove/vps-scripts/main/scripts"
 
 # Multi-platform language detector
 detect_language "$1"
@@ -85,10 +86,14 @@ load_module() {
     if [ -f "$local_file" ]; then
         bash "$local_file" "$LANG_ENV"
     else
-        echo -e "${gl_huang}Downloading module ${module_name} remotely...${gl_bai}"
+        echo -e "${gl_huang}$(get_msg 'downloading_script')${module_name}...${gl_bai}"
         mkdir -p /tmp/vps-scripts/scripts 2>/dev/null
-        curl -sSL "${GITHUB_RAW_BASE}/${module_name}.sh" -o "/tmp/vps-scripts/scripts/${module_name}.sh"
-        bash "/tmp/vps-scripts/scripts/${module_name}.sh" "$LANG_ENV"
+        if curl -sSL "${GITHUB_RAW_BASE}/${module_name}.sh" -o "/tmp/vps-scripts/scripts/${module_name}.sh"; then
+            bash "/tmp/vps-scripts/scripts/${module_name}.sh" "$LANG_ENV"
+        else
+            echo -e "${gl_hong}$(get_msg 'failed_download')${gl_bai}"
+            sleep 2
+        fi
     fi
 }
 

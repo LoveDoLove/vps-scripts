@@ -51,6 +51,8 @@ get_msg() {
                 "need_root") echo "此操作需要 root 權限，請切換至 root 或使用 sudo 執行。" ;;
                 "detecting_os") echo "正在偵測操作系統..." ;;
                 "unknown_pm") echo "未知的套件管理器！" ;;
+                "downloading_script") echo "正在下載腳本... " ;;
+                "failed_download") echo "腳本下載失敗！請檢查網絡連接後重試。" ;;
                 "disk_insufficient") echo "磁碟空間不足！" ;;
                 "current_avail") echo "當前可用空間: " ;;
                 "min_req") echo "最小需求空間: " ;;
@@ -78,6 +80,8 @@ get_msg() {
                 "need_root") echo "This operation requires root privileges. Please run as root or with sudo." ;;
                 "detecting_os") echo "Detecting operating system..." ;;
                 "unknown_pm") echo "Unknown package manager!" ;;
+                "downloading_script") echo "Downloading script... " ;;
+                "failed_download") echo "Failed to download script! Please check network connection." ;;
                 "disk_insufficient") echo "Disk space is insufficient!" ;;
                 "current_avail") echo "Current available space: " ;;
                 "min_req") echo "Minimum required space: " ;;
