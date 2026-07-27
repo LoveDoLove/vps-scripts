@@ -238,7 +238,7 @@ Project Link: [https://github.com/LoveDoLove/vps-scripts](https://github.com/Lov
 
 - [Best-README-Template](https://github.com/othneildrew/Best-README-Template) — README template
 - [othneildrew](https://github.com/othneildrew) — README template author
-- Thanks to kejilion for the original inspiration
+- This project is a modular bilingual fork of [kejilion/sh](https://github.com/kejilion/sh) — a comprehensive Linux server management toolkit.
 - [Docker](https://docker.com) — container runtime
 - [Let's Encrypt](https://letsencrypt.org) — free SSL certificates
 - [Cloudflare WARP](https://1.1.1.1) — network privacy gateway
